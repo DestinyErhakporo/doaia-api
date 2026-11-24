@@ -1,0 +1,36 @@
+---
+title: "Retries and cancellation"
+description: "When you can cancel or retry a run, and what each action does."
+keywords: ["retry", "cancel", "attempt", "original_run_id"]
+---
+
+## Cancellation
+
+Only `queued` and `running` runs can be cancelled.
+
+- `POST /v1/runs/{run_id}/cancel` returns `202 Accepted`. This means the request was accepted, not that cancellation has finished.
+- Poll the run until `status` is `cancelled`. Until then `cancel_requested_at` is set and the run may still be `running`.
+- A run that finishes before cancellation takes effect can end as `succeeded` or `failed`.
+- Calling cancel again while a request is pending also returns `202`.
+- A run in a terminal state returns `409 INVALID_STATE`.
+
+## Manual retry
+
+Only `failed` runs can be retried. `POST /v1/runs/{run_id}/retry` creates a new run and keeps the original.
+
+| Property | Value |
+| --- | --- |
+| Response | `202 Accepted` with the new run |
+| Input and workflow version | Same as the failed run, not the latest version |
+| Mode | Asynchronous |
+| `attempt` | Previous attempt plus one |
+| `original_run_id` | The first run in the chain |
+
+A run that has already been retried, and a run of an archived workflow, return `409 INVALID_STATE`. If a retry also fails, retry that newest failed run.
+
+Automatic retry policies are not part of v1.
+
+## Related
+
+- [Retry and cancel guide](/docs/guides/retry-and-cancel)
+- [Runs and states](/docs/concepts/runs-and-states)

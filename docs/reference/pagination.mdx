@@ -1,0 +1,44 @@
+---
+title: "Pagination"
+description: "Cursor pagination for list endpoints."
+keywords: ["pagination", "cursor", "limit", "next_cursor", "has_more"]
+---
+
+List endpoints return newest items first and use cursor pagination: `GET /v1/workflows`, `GET /v1/runs` and `GET /v1/workflows/{workflow_id}/runs`.
+
+## Parameters
+
+| Parameter | Default | Maximum | Notes |
+| --- | --- | --- | --- |
+| `limit` | 20 | 100 | Items per page. Values outside 1 to 100 return `400 INVALID_REQUEST`. |
+| `cursor` | none | n/a | Opaque value from `next_cursor`. Omit for the first page. |
+
+The default and maximum page sizes are v1 design choices.
+
+## Response shape
+
+```json Paginated response
+{
+  "data": [],
+  "pagination": {
+    "limit": 20,
+    "next_cursor": null,
+    "has_more": false
+  }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `data` | The items on this page. |
+| `limit` | The page size used. |
+| `has_more` | `true` when more items exist. |
+| `next_cursor` | Pass as `cursor` to get the next page. `null` when `has_more` is `false`. |
+
+## Walk all pages
+
+1. Request the first page without `cursor`.
+2. If `has_more` is `true`, request again with `cursor` set to `next_cursor`.
+3. Stop when `has_more` is `false`.
+
+Treat cursors as opaque. Do not parse or build them, and keep the same filters while paging.

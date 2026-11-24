@@ -1,0 +1,108 @@
+---
+title: "Quickstart"
+description: "Create a custom workflow, start an asynchronous run, poll it and read the result."
+keywords: ["quickstart", "first run", "curl"]
+---
+
+import NotLive from "/snippets/not-live.mdx";
+
+<NotLive />
+
+This walkthrough uses cURL and the placeholder key `YOUR_DOAIA_API_KEY`. Multi-language examples are in the [guides](/docs/guides/create-a-workflow).
+
+## Prerequisites
+
+- A DOAIA API key. How keys are issued is outside the v1 contract.
+- A tool that can send HTTPS requests, such as cURL.
+
+<Steps>
+  <Step title="Authenticate">
+    Send your key in the `Authorization` header on every request. See [Authentication](/docs/authentication).
+
+    ```bash List workflows
+    curl 'https://api.example.com/v1/workflows' \
+      -H 'Authorization: Bearer YOUR_DOAIA_API_KEY'
+    ```
+
+    Expect `200 OK` with the predefined workflows and your own. A missing or invalid key returns `401 UNAUTHENTICATED`.
+  </Step>
+
+  <Step title="Create a workflow">
+    This workflow generates a welcome message, then trims it. The second step reads the first step's output through a reference object.
+
+    ```bash Create a workflow
+    curl -X POST 'https://api.example.com/v1/workflows' \
+      -H 'Authorization: Bearer YOUR_DOAIA_API_KEY' \
+      -H 'Content-Type: application/json' \
+      -d '{
+        "name": "Customer onboarding",
+        "description": "Drafts a short welcome message for a new customer.",
+        "input_schema": {
+          "type": "object",
+          "properties": { "customer_name": { "type": "string" } },
+          "required": ["customer_name"]
+        },
+        "steps": [
+          {
+            "id": "generate_welcome",
+            "type": "ai.generate",
+            "input": { "prompt": { "ref": "input.customer_name" } },
+            "config": { "instruction": "Write a two-sentence welcome message for the customer named in the prompt." }
+          },
+          {
+            "id": "tidy_welcome",
+            "type": "data.transform",
+            "input": { "value": { "ref": "steps.generate_welcome.output.text" } },
+            "config": { "operation": "trim" }
+          }
+        ],
+        "outputs": {
+          "welcome_message": { "ref": "steps.tidy_welcome.output.value" }
+        }
+      }'
+    ```
+
+    Expect `201 Created` with the workflow at `version` 1. A definition error returns `422 VALIDATION_ERROR` with `details` that name the field.
+  </Step>
+
+  <Step title="Start a run">
+    Use the workflow `id` from the previous response. The examples use `wf_customer_onboarding`.
+
+    ```bash Start an asynchronous run
+    curl -X POST 'https://api.example.com/v1/workflows/wf_customer_onboarding/runs' \
+      -H 'Authorization: Bearer YOUR_DOAIA_API_KEY' \
+      -H 'Content-Type: application/json' \
+      -H 'Idempotency-Key: example-run-001' \
+      -d '{
+        "execution_mode": "async",
+        "input": { "customer_name": "Alex" }
+      }'
+    ```
+
+    Expect `202 Accepted` with a run in the `queued` state. Save the run `id`.
+  </Step>
+
+  <Step title="Poll the run">
+    ```bash Retrieve a run
+    curl 'https://api.example.com/v1/runs/run_01JXYZ123' \
+      -H 'Authorization: Bearer YOUR_DOAIA_API_KEY'
+    ```
+
+    Repeat until `status` is `succeeded`, `failed` or `cancelled`.
+  </Step>
+
+  <Step title="Read the result">
+    ```bash Retrieve results
+    curl 'https://api.example.com/v1/runs/run_01JXYZ123/results' \
+      -H 'Authorization: Bearer YOUR_DOAIA_API_KEY'
+    ```
+
+    Expect `200 OK` with the resolved `result`. While the run is still in progress you get `409 RUN_NOT_COMPLETED`; keep polling.
+  </Step>
+</Steps>
+
+## Next steps
+
+- Learn how [steps and references](/docs/concepts/workflow-steps) work.
+- Compare [synchronous and asynchronous runs](/docs/concepts/execution-modes).
+- Handle failures with [retry and cancel](/docs/guides/retry-and-cancel).

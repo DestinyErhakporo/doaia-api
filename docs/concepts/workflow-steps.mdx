@@ -1,0 +1,51 @@
+---
+title: "Workflow steps"
+description: "The three v1 step types, how steps run, and how references work."
+keywords: ["steps", "ai.generate", "ai.summarize", "data.transform", "references"]
+---
+
+## Step catalogue
+
+Each step has an `id`, a `type`, an `input` object and, depending on the type, a `config` object. `input` carries the data the step works on and may use references. `config` carries fixed settings and never uses references.
+
+| Type | Purpose | `input` | `config` | Output field |
+| --- | --- | --- | --- | --- |
+| `ai.generate` | Generate text from a prompt. | `prompt` (required) | `instruction` (optional string) | `text` |
+| `ai.summarize` | Summarize supplied text. | `text` (required) | `max_words` (optional integer, 1 to 1000) | `summary` |
+| `data.transform` | Apply a basic text operation. | `value` (required) | `operation` (required): `uppercase`, `lowercase` or `trim` | `value` |
+
+## Execution order
+
+Steps run one after another in the order you declare them. Parallel branches, loops, conditional steps and arbitrary external HTTP requests are not part of v1.
+
+## References
+
+A reference object reads a value instead of supplying it literally. Two forms are allowed:
+
+| Form | Reads |
+| --- | --- |
+| `input.field_name` | A field of the run input. |
+| `steps.step_id.output.field_name` | An output field of an earlier step. |
+
+```json Reference object
+{ "ref": "steps.generate_welcome.output.text" }
+```
+
+References are legal in step `input` values and in workflow `outputs`. A step can only reference the run input or steps declared before it.
+
+## Validation
+
+Creating or updating a workflow returns `422 VALIDATION_ERROR` when:
+
+- a step `type` is not supported,
+- two steps share an `id`,
+- step `input` or `config` is invalid,
+- a reference points to an unknown step, an unknown input field, or a step declared later (a forward reference),
+- the workflow has more than 20 steps.
+
+The `details` array names each offending field, for example `steps[1].input.value`.
+
+## Related
+
+- [Create a workflow](/docs/guides/create-a-workflow)
+- [Limits and retention](/docs/reference/limits-and-retention)

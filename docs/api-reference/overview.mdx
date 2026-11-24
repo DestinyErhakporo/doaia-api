@@ -1,0 +1,43 @@
+---
+title: "API overview"
+description: "Base URL, authentication, conventions and the 12 DOAIA v1 endpoints."
+keywords: ["API reference", "endpoints", "base URL", "conventions"]
+---
+
+import NotLive from "/snippets/not-live.mdx";
+
+<NotLive />
+
+The pages in this section are generated from the OpenAPI 3.1 contract, which is the source of truth for every endpoint, parameter and schema.
+
+## Basics
+
+| Item | Value |
+| --- | --- |
+| Base URL | `https://api.example.com` (placeholder) |
+| Version | `v1`, in the path |
+| Authentication | Bearer API key. See [Authentication](/docs/authentication). |
+| Format | JSON, `snake_case` fields, ISO 8601 UTC timestamps |
+| Errors | One envelope. See [Errors](/docs/reference/errors). |
+| Lists | Cursor pagination. See [Pagination](/docs/reference/pagination). |
+
+## Endpoints
+
+| Method and path | Purpose | Success |
+| --- | --- | --- |
+| `GET /v1/workflows` | List workflows | `200` |
+| `POST /v1/workflows` | Create a custom workflow | `201` |
+| `GET /v1/workflows/{workflow_id}` | Retrieve a workflow | `200` |
+| `PATCH /v1/workflows/{workflow_id}` | Update a custom workflow | `200` |
+| `DELETE /v1/workflows/{workflow_id}` | Archive a custom workflow | `204` |
+| `POST /v1/workflows/{workflow_id}/runs` | Start a run | `200` or `202` |
+| `GET /v1/workflows/{workflow_id}/runs` | List runs for one workflow | `200` |
+| `GET /v1/runs` | List execution history | `200` |
+| `GET /v1/runs/{run_id}` | Retrieve a run | `200` |
+| `GET /v1/runs/{run_id}/results` | Retrieve results | `200` |
+| `POST /v1/runs/{run_id}/cancel` | Request cancellation | `202` |
+| `POST /v1/runs/{run_id}/retry` | Retry a failed run | `202` |
+
+## Try it
+
+The interactive playground is set to simple mode because the server is a placeholder. Use the generated cURL, JavaScript and Python examples as templates.

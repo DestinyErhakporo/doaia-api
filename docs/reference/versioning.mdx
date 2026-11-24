@@ -1,0 +1,25 @@
+---
+title: "Versioning"
+description: "How API versions, workflow versions and run snapshots relate."
+keywords: ["versioning", "v1", "workflow version", "snapshot"]
+---
+
+DOAIA has two kinds of version. Do not confuse them.
+
+## API version
+
+The API version is part of every path, for example `/v1/workflows`. This documentation describes `v1`, which the OpenAPI file declares as `1.0.0`.
+
+## Workflow version
+
+- A new workflow starts at `version` 1.
+- Each successful `PATCH` increases it by one.
+- Predefined workflows are read-only, so they do not change through the API.
+
+## Run snapshots
+
+A run records the `workflow_version` it started with. Later edits do not affect a run in progress or in history. A [manual retry](/docs/concepts/retries-and-cancellation) reuses the failed run's version, not the latest one.
+
+## Compatibility
+
+This is a conceptual contract, so no compatibility guarantees are made. In a real service you would document your policy for additive and breaking changes here.

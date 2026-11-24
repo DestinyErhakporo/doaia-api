@@ -1,0 +1,166 @@
+---
+title: "Create a workflow"
+description: "Define a custom workflow with an input schema, chained steps and outputs."
+keywords: ["create workflow", "input_schema", "steps", "outputs", "POST /v1/workflows"]
+---
+
+import NotLive from "/snippets/not-live.mdx";
+
+<NotLive />
+
+You create a custom workflow with `POST /v1/workflows`. The example below chains two steps: `ai.generate` drafts a message and `data.transform` trims it.
+
+## Fields
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| `name` | Yes | 1 to 120 characters. |
+| `description` | No | Up to 1000 characters. |
+| `input_schema` | No | JSON Schema object with `type` set to `object`. Omit it if the workflow takes no input. |
+| `steps` | Yes | 1 to 20 steps. See [Workflow steps](/docs/concepts/workflow-steps). |
+| `outputs` | Yes | Map of output names to reference objects. |
+
+## Send the request
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST 'https://api.example.com/v1/workflows' \
+  -H 'Authorization: Bearer YOUR_DOAIA_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Customer onboarding",
+    "description": "Drafts a short welcome message for a new customer.",
+    "input_schema": {
+      "type": "object",
+      "properties": { "customer_name": { "type": "string" } },
+      "required": ["customer_name"]
+    },
+    "steps": [
+      {
+        "id": "generate_welcome",
+        "type": "ai.generate",
+        "input": { "prompt": { "ref": "input.customer_name" } },
+        "config": { "instruction": "Write a two-sentence welcome message for the customer named in the prompt." }
+      },
+      {
+        "id": "tidy_welcome",
+        "type": "data.transform",
+        "input": { "value": { "ref": "steps.generate_welcome.output.text" } },
+        "config": { "operation": "trim" }
+      }
+    ],
+    "outputs": {
+      "welcome_message": { "ref": "steps.tidy_welcome.output.value" }
+    }
+  }'
+```
+
+```javascript JavaScript
+const workflow = {
+  name: "Customer onboarding",
+  description: "Drafts a short welcome message for a new customer.",
+  input_schema: {
+    type: "object",
+    properties: { customer_name: { type: "string" } },
+    required: ["customer_name"],
+  },
+  steps: [
+    {
+      id: "generate_welcome",
+      type: "ai.generate",
+      input: { prompt: { ref: "input.customer_name" } },
+      config: {
+        instruction:
+          "Write a two-sentence welcome message for the customer named in the prompt.",
+      },
+    },
+    {
+      id: "tidy_welcome",
+      type: "data.transform",
+      input: { value: { ref: "steps.generate_welcome.output.text" } },
+      config: { operation: "trim" },
+    },
+  ],
+  outputs: { welcome_message: { ref: "steps.tidy_welcome.output.value" } },
+};
+
+const response = await fetch("https://api.example.com/v1/workflows", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer YOUR_DOAIA_API_KEY",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(workflow),
+});
+const created = await response.json();
+```
+
+```python Python
+import requests
+
+workflow = {
+    "name": "Customer onboarding",
+    "description": "Drafts a short welcome message for a new customer.",
+    "input_schema": {
+        "type": "object",
+        "properties": {"customer_name": {"type": "string"}},
+        "required": ["customer_name"],
+    },
+    "steps": [
+        {
+            "id": "generate_welcome",
+            "type": "ai.generate",
+            "input": {"prompt": {"ref": "input.customer_name"}},
+            "config": {
+                "instruction": "Write a two-sentence welcome message for the customer named in the prompt."
+            },
+        },
+        {
+            "id": "tidy_welcome",
+            "type": "data.transform",
+            "input": {"value": {"ref": "steps.generate_welcome.output.text"}},
+            "config": {"operation": "trim"},
+        },
+    ],
+    "outputs": {"welcome_message": {"ref": "steps.tidy_welcome.output.value"}},
+}
+
+response = requests.post(
+    "https://api.example.com/v1/workflows",
+    headers={"Authorization": "Bearer YOUR_DOAIA_API_KEY"},
+    json=workflow,
+    timeout=30,
+)
+created = response.json()
+```
+
+</CodeGroup>
+
+## Expected responses
+
+| Status | Meaning | What to do next |
+| --- | --- | --- |
+| `201` | Workflow created at `version` 1. | Save the returned `id` and [run it](/docs/guides/run-a-workflow). |
+| `400` | The body is malformed. | Fix the JSON and resend. |
+| `422` | The definition failed validation. | Read `error.details`, fix the named fields and resend. |
+
+```json Validation error
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "The workflow definition is invalid.",
+    "request_id": "req_01JXYZ129",
+    "details": [
+      {
+        "field": "steps[1].input.value",
+        "message": "References an output of a step that is not declared earlier."
+      }
+    ]
+  }
+}
+```
+
+## Update later
+
+`PATCH /v1/workflows/{workflow_id}` replaces each field you send as a whole and increments `version`. Runs already started keep their original version.

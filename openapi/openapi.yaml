@@ -1,0 +1,1521 @@
+openapi: 3.1.0
+
+info:
+  title: DOAIA API
+  version: 1.0.0
+  summary: Conceptual AI workflow orchestration API (v1).
+  description: |
+    DOAIA is a **fictional, conceptual** REST API used as a documentation-engineering
+    portfolio project. This file is the canonical contract for v1.
+
+    - No live service exists behind this contract.
+    - The server URL is a placeholder (`api.example.com`). Requests sent to it will not work.
+    - Limits and retention periods are illustrative design assumptions, not benchmarked claims.
+
+    ## Conventions
+
+    - JSON request and response bodies use `snake_case` field names.
+    - Timestamps are ISO 8601 in UTC (for example `2026-11-22T18:15:00Z`).
+    - IDs are opaque strings with a type prefix (`wf_` for workflows, `run_` for runs).
+    - All errors use one envelope. See the `ErrorResponse` schema.
+    - List endpoints use cursor pagination (`limit`, `cursor`).
+
+servers:
+  - url: https://api.example.com
+    description: Placeholder server. No live API is provided.
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Workflows
+    description: Define, read, update and archive workflows.
+  - name: Runs
+    description: Start, monitor, cancel, retry and inspect workflow executions.
+
+paths:
+  /v1/workflows:
+    get:
+      tags: [Workflows]
+      operationId: listWorkflows
+      summary: List workflows
+      description: |
+        Returns predefined workflows and the custom workflows your account can access,
+        newest first, using cursor pagination.
+
+        Archived workflows are hidden unless you pass `status=archived` or `status=all`.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - name: type
+          in: query
+          description: Return only workflows of this type.
+          required: false
+          schema:
+            $ref: '#/components/schemas/WorkflowType'
+        - name: status
+          in: query
+          description: Filter by lifecycle status. Defaults to `active`.
+          required: false
+          schema:
+            type: string
+            enum: [active, archived, all]
+            default: active
+      responses:
+        '200':
+          description: A page of workflows.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowList'
+              examples:
+                firstPage:
+                  $ref: '#/components/examples/WorkflowListExample'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      tags: [Workflows]
+      operationId: createWorkflow
+      summary: Create a workflow
+      description: |
+        Creates a custom workflow at version 1 after validating its definition.
+
+        Validation rejects unsupported step types, duplicate step IDs, invalid step
+        configuration, more than 20 steps, and references that point to an unknown input
+        field or to a step that is not declared earlier in the `steps` array.
+        Failures return `422 VALIDATION_ERROR` with per-field `details`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowCreateRequest'
+            examples:
+              customerOnboarding:
+                $ref: '#/components/examples/WorkflowCreateExample'
+      responses:
+        '201':
+          description: Workflow created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+              examples:
+                created:
+                  $ref: '#/components/examples/WorkflowExample'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/workflows/{workflow_id}:
+    get:
+      tags: [Workflows]
+      operationId: getWorkflow
+      summary: Retrieve a workflow
+      description: >
+        Returns the workflow definition (inputs, steps and outputs) and metadata.
+        Archived workflows can still be retrieved.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '200':
+          description: The workflow.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+              examples:
+                customerOnboarding:
+                  $ref: '#/components/examples/WorkflowExample'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    patch:
+      tags: [Workflows]
+      operationId: updateWorkflow
+      summary: Update a custom workflow
+      description: |
+        Updates a custom workflow. Send only the fields you want to change; each
+        supplied field replaces the existing value as a whole (arrays and objects are not merged).
+
+        A successful update increments `version` by one. Runs that already started keep
+        the version they started with.
+
+        - Predefined workflows are read-only and return `403 FORBIDDEN`.
+        - Archived workflows cannot be updated and return `409 INVALID_STATE`.
+        - `id`, `type`, `status`, `version` and timestamps are server-managed and cannot be set.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowUpdateRequest'
+            examples:
+              rename:
+                summary: Rename a workflow
+                value:
+                  name: Customer onboarding (v2 copy)
+      responses:
+        '200':
+          description: The updated workflow, with its new version number.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      tags: [Workflows]
+      operationId: archiveWorkflow
+      summary: Archive a custom workflow
+      description: |
+        Soft-archives a custom workflow. Archived workflows cannot start new runs, but their
+        definition and run history remain available.
+
+        Archiving an already archived workflow also returns `204`. Predefined workflows
+        cannot be archived and return `403 FORBIDDEN`.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '204':
+          description: Workflow archived. No response body.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/workflows/{workflow_id}/runs:
+    post:
+      tags: [Runs]
+      operationId: createRun
+      summary: Start a workflow run
+      description: |
+        Starts a run of the workflow's current version. Both execution modes create the same
+        underlying run resource.
+
+        | Mode | Behavior | Response |
+        | --- | --- | --- |
+        | `async` (default) | Returns as soon as the run is accepted. Poll `GET /v1/runs/{run_id}`. | `202` with the run |
+        | `sync`, finished in time | Waits up to `wait_timeout_seconds` (max 30). | `200` with the run and its `result` |
+        | `sync`, wait expired | The run keeps executing. Poll with the returned run ID. | `202` with the run |
+
+        A synchronous run that finishes in time returns `200` even if the run itself `failed`;
+        check `status` and `failure`.
+
+        **Idempotency.** Send an `Idempotency-Key` header to make retries safe. For 24 hours, the same
+        key with the same request returns the original response (with `Idempotent-Replayed: true`);
+        the same key with a different request returns `409 IDEMPOTENCY_CONFLICT`.
+
+        Archived workflows cannot start runs (`409 INVALID_STATE`).
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunCreateRequest'
+            examples:
+              async:
+                summary: Asynchronous run
+                value:
+                  execution_mode: async
+                  input:
+                    customer_name: Alex
+              sync:
+                summary: Synchronous run with a 20 second wait
+                value:
+                  execution_mode: sync
+                  wait_timeout_seconds: 20
+                  input:
+                    customer_name: Alex
+      responses:
+        '200':
+          description: Synchronous run finished within the wait period.
+          headers:
+            Idempotent-Replayed:
+              $ref: '#/components/headers/IdempotentReplayed'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunWithResult'
+              examples:
+                succeeded:
+                  $ref: '#/components/examples/RunSyncSucceededExample'
+        '202':
+          description: >
+            Run accepted (asynchronous mode), or the synchronous wait expired while the run
+            continues. Poll the run by ID.
+          headers:
+            Idempotent-Replayed:
+              $ref: '#/components/headers/IdempotentReplayed'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+              examples:
+                queued:
+                  $ref: '#/components/examples/RunQueuedExample'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: >
+            The workflow is archived (`INVALID_STATE`), or the idempotency key was already used
+            with a different request (`IDEMPOTENCY_CONFLICT`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                idempotencyConflict:
+                  summary: Same key, different request
+                  value:
+                    error:
+                      code: IDEMPOTENCY_CONFLICT
+                      message: This Idempotency-Key was already used with a different request.
+                      request_id: req_01JXYZ130
+                      details: []
+                archivedWorkflow:
+                  summary: Workflow is archived
+                  value:
+                    error:
+                      code: INVALID_STATE
+                      message: Archived workflows cannot start new runs.
+                      request_id: req_01JXYZ131
+                      details: []
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    get:
+      tags: [Runs]
+      operationId: listWorkflowRuns
+      summary: List runs for a workflow
+      description: >
+        Returns the run history of one workflow, newest first. Includes runs of every workflow
+        version, and works for archived workflows. Runs are retained for 30 days.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/RunStatusFilter'
+        - $ref: '#/components/parameters/CreatedAfter'
+        - $ref: '#/components/parameters/CreatedBefore'
+      responses:
+        '200':
+          description: A page of runs for the workflow.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunList'
+              examples:
+                firstPage:
+                  $ref: '#/components/examples/RunListExample'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/runs:
+    get:
+      tags: [Runs]
+      operationId: listRuns
+      summary: List execution history
+      description: >
+        Returns account-wide run history, newest first, using cursor pagination. Runs are
+        retained for 30 days.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/RunStatusFilter'
+        - $ref: '#/components/parameters/CreatedAfter'
+        - $ref: '#/components/parameters/CreatedBefore'
+        - name: workflow_id
+          in: query
+          description: Return only runs of this workflow.
+          required: false
+          schema:
+            $ref: '#/components/schemas/WorkflowId'
+      responses:
+        '200':
+          description: A page of runs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunList'
+              examples:
+                firstPage:
+                  $ref: '#/components/examples/RunListExample'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/runs/{run_id}:
+    get:
+      tags: [Runs]
+      operationId: getRun
+      summary: Retrieve a run
+      description: >
+        Returns the run's status, timestamps, workflow version, attempt number and, for failed
+        runs, failure details. Poll this endpoint until `status` is `succeeded`, `failed` or
+        `cancelled`.
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: The run.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+              examples:
+                running:
+                  $ref: '#/components/examples/RunQueuedExample'
+                failed:
+                  $ref: '#/components/examples/RunFailedExample'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/runs/{run_id}/results:
+    get:
+      tags: [Runs]
+      operationId: getRunResults
+      summary: Retrieve run results
+      description: |
+        Returns the final result of a run that finished with status `succeeded`.
+
+        | Run status | Response |
+        | --- | --- |
+        | `succeeded` | `200` with the result |
+        | `queued` or `running` | `409 RUN_NOT_COMPLETED`. Keep polling. |
+        | `failed` or `cancelled` | `409 INVALID_STATE`. Use `GET /v1/runs/{run_id}` for failure details. |
+
+        Results are retained for 30 days.
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: The run result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunResult'
+              examples:
+                succeeded:
+                  $ref: '#/components/examples/RunResultExample'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: >
+            Results are not available: the run is not complete (`RUN_NOT_COMPLETED`) or it ended
+            without results (`INVALID_STATE`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notCompleted:
+                  summary: Run still in progress
+                  value:
+                    error:
+                      code: RUN_NOT_COMPLETED
+                      message: Results are not available yet.
+                      request_id: req_01JXYZ123
+                      details: []
+                noResults:
+                  summary: Run failed or was cancelled
+                  value:
+                    error:
+                      code: INVALID_STATE
+                      message: This run ended without results. Retrieve the run for failure details.
+                      request_id: req_01JXYZ132
+                      details: []
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/runs/{run_id}/cancel:
+    post:
+      tags: [Runs]
+      operationId: cancelRun
+      summary: Request run cancellation
+      description: |
+        Requests cancellation of a `queued` or `running` run.
+
+        A `202` response means the request was **accepted**, not that cancellation has completed.
+        Poll the run until `status` is `cancelled`. A run that finishes before cancellation takes
+        effect may end as `succeeded` or `failed` instead.
+
+        Calling this again while a request is pending also returns `202`. Runs in a terminal
+        state return `409 INVALID_STATE`.
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '202':
+          description: Cancellation requested.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+              examples:
+                cancelRequested:
+                  $ref: '#/components/examples/RunCancelRequestedExample'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /v1/runs/{run_id}/retry:
+    post:
+      tags: [Runs]
+      operationId: retryRun
+      summary: Retry a failed run
+      description: |
+        Manually retries a `failed` run by creating a **new** run. The original run is preserved.
+
+        The new run:
+
+        - uses the same input and the same workflow version as the failed run (not the latest version),
+        - runs asynchronously, so poll it by ID,
+        - has `attempt` increased by one and `original_run_id` set to the first run in the chain.
+
+        Only failed runs can be retried. A run that was already retried, or a run of an archived
+        workflow, returns `409 INVALID_STATE`; retry the newest failed run in the chain instead.
+        Automatic retry policies are not part of v1.
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '202':
+          description: Retry accepted. The response is the new run.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+              examples:
+                retry:
+                  $ref: '#/components/examples/RunRetryExample'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API key
+      description: >
+        Send your API key in the `Authorization: Bearer YOUR_DOAIA_API_KEY` header over HTTPS.
+        Keys in this documentation are placeholders; no real keys exist.
+
+  parameters:
+    WorkflowId:
+      name: workflow_id
+      in: path
+      required: true
+      description: ID of the workflow.
+      schema:
+        $ref: '#/components/schemas/WorkflowId'
+    RunId:
+      name: run_id
+      in: path
+      required: true
+      description: ID of the run.
+      schema:
+        $ref: '#/components/schemas/RunId'
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return per page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: >
+        Opaque cursor from the `next_cursor` field of a previous response. Omit to start from the
+        first page.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 512
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: >
+        Unique key (for example a UUID) that makes run creation safe to retry. Keys are retained
+        for 24 hours.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+      example: onboarding-001
+    RunStatusFilter:
+      name: status
+      in: query
+      required: false
+      description: Return only runs in this state.
+      schema:
+        $ref: '#/components/schemas/RunStatus'
+    CreatedAfter:
+      name: created_after
+      in: query
+      required: false
+      description: Return only runs created at or after this ISO 8601 UTC timestamp.
+      schema:
+        type: string
+        format: date-time
+    CreatedBefore:
+      name: created_before
+      in: query
+      required: false
+      description: Return only runs created before this ISO 8601 UTC timestamp.
+      schema:
+        type: string
+        format: date-time
+
+  headers:
+    IdempotentReplayed:
+      description: Present and `true` when the response is a replay of an earlier request with the same idempotency key.
+      schema:
+        type: boolean
+    RetryAfter:
+      description: Seconds to wait before retrying.
+      schema:
+        type: integer
+        minimum: 0
+    RateLimitLimit:
+      description: Maximum number of requests allowed in the current window.
+      schema:
+        type: integer
+    RateLimitRemaining:
+      description: Requests remaining in the current window.
+      schema:
+        type: integer
+    RateLimitReset:
+      description: Unix time (seconds, UTC) when the current window resets.
+      schema:
+        type: integer
+
+  responses:
+    BadRequest:
+      description: Malformed request or invalid parameter (`INVALID_REQUEST`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INVALID_REQUEST
+              message: The limit parameter must be between 1 and 100.
+              request_id: req_01JXYZ124
+              details:
+                - field: limit
+                  message: Must be less than or equal to 100.
+    Unauthorized:
+      description: Missing or invalid credentials (`UNAUTHENTICATED`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHENTICATED
+              message: Missing or invalid API key.
+              request_id: req_01JXYZ125
+              details: []
+    Forbidden:
+      description: Authenticated but not permitted (`FORBIDDEN`). Returned for changes to predefined workflows.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: FORBIDDEN
+              message: Predefined workflows are read-only.
+              request_id: req_01JXYZ126
+              details: []
+    NotFound:
+      description: The resource does not exist, has expired, or is not accessible (`RESOURCE_NOT_FOUND`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: RESOURCE_NOT_FOUND
+              message: The requested resource was not found.
+              request_id: req_01JXYZ127
+              details: []
+    Conflict:
+      description: The action is not valid for the resource's current state (`INVALID_STATE`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INVALID_STATE
+              message: Only queued or running runs can be cancelled.
+              request_id: req_01JXYZ128
+              details: []
+    ValidationError:
+      description: Workflow, step or input validation failed (`VALIDATION_ERROR`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: The workflow definition is invalid.
+              request_id: req_01JXYZ129
+              details:
+                - field: steps[1].input.value
+                  message: References an output of a step that is not declared earlier.
+    TooManyRequests:
+      description: Rate limit exceeded (`RATE_LIMITED`).
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/RateLimitLimit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/RateLimitRemaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/RateLimitReset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: RATE_LIMITED
+              message: Too many requests. Retry after the number of seconds in the Retry-After header.
+              request_id: req_01JXYZ133
+              details: []
+    InternalError:
+      description: Unexpected server-side error (`INTERNAL_ERROR`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: An unexpected error occurred.
+              request_id: req_01JXYZ134
+              details: []
+    ServiceUnavailable:
+      description: Service temporarily unavailable (`SERVICE_UNAVAILABLE`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: The service is temporarily unavailable.
+              request_id: req_01JXYZ135
+              details: []
+
+  schemas:
+    WorkflowId:
+      type: string
+      pattern: '^wf_[A-Za-z0-9_]+$'
+      description: Workflow identifier.
+      examples: [wf_customer_onboarding]
+    RunId:
+      type: string
+      pattern: '^run_[A-Za-z0-9_]+$'
+      description: Run identifier.
+      examples: [run_01JXYZ123]
+    StepId:
+      type: string
+      pattern: '^[a-z][a-z0-9_]{0,63}$'
+      description: Step identifier. Unique within a workflow. Lowercase letters, digits and underscores.
+      examples: [generate_welcome]
+
+    WorkflowType:
+      type: string
+      enum: [predefined, custom]
+      description: '`predefined` workflows are read-only. `custom` workflows are created and managed by you.'
+    WorkflowStatus:
+      type: string
+      enum: [active, archived]
+      description: '`archived` workflows cannot start new runs; their history remains available.'
+    RunStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, cancelled]
+      description: >
+        Run lifecycle state. `queued` and `running` are non-terminal. `succeeded`, `failed` and
+        `cancelled` are terminal.
+    ExecutionMode:
+      type: string
+      enum: [sync, async]
+
+    ReferenceObject:
+      type: object
+      description: |
+        Reads a value from the workflow input or from the output of an **earlier** step.
+        Plain strings are never treated as references; only this object form is.
+
+        Allowed forms:
+        - `input.field_name`
+        - `steps.step_id.output.field_name`
+
+        References are legal in step `input` values and in workflow `outputs`. They are not
+        allowed in step `config`.
+      required: [ref]
+      additionalProperties: false
+      properties:
+        ref:
+          type: string
+          pattern: '^(input\.[a-z][a-z0-9_]*|steps\.[a-z][a-z0-9_]*\.output\.[a-z][a-z0-9_]*)$'
+          examples: [steps.generate_welcome.output.text]
+    ValueOrReference:
+      description: A literal string, or a reference object that resolves to a string at run time.
+      oneOf:
+        - type: string
+          maxLength: 262144
+        - $ref: '#/components/schemas/ReferenceObject'
+
+    AiGenerateStep:
+      type: object
+      description: >
+        Generates text from a prompt. Output field: `text`.
+      required: [id, type, input]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/StepId'
+        type:
+          type: string
+          const: ai.generate
+        input:
+          type: object
+          required: [prompt]
+          additionalProperties: false
+          properties:
+            prompt:
+              $ref: '#/components/schemas/ValueOrReference'
+        config:
+          type: object
+          additionalProperties: false
+          properties:
+            instruction:
+              type: string
+              maxLength: 2000
+              description: Optional fixed guidance applied to the generation.
+    AiSummarizeStep:
+      type: object
+      description: >
+        Summarizes supplied text. Output field: `summary`.
+      required: [id, type, input]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/StepId'
+        type:
+          type: string
+          const: ai.summarize
+        input:
+          type: object
+          required: [text]
+          additionalProperties: false
+          properties:
+            text:
+              $ref: '#/components/schemas/ValueOrReference'
+        config:
+          type: object
+          additionalProperties: false
+          properties:
+            max_words:
+              type: integer
+              minimum: 1
+              maximum: 1000
+              description: Optional upper bound on the summary length, in words.
+    DataTransformStep:
+      type: object
+      description: >
+        Applies a basic text operation to a value. Output field: `value`.
+      required: [id, type, input, config]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/StepId'
+        type:
+          type: string
+          const: data.transform
+        input:
+          type: object
+          required: [value]
+          additionalProperties: false
+          properties:
+            value:
+              $ref: '#/components/schemas/ValueOrReference'
+        config:
+          type: object
+          required: [operation]
+          additionalProperties: false
+          properties:
+            operation:
+              type: string
+              enum: [uppercase, lowercase, trim]
+    WorkflowStep:
+      description: >
+        One step of a workflow. Steps run sequentially in the order declared. Select the schema by
+        the `type` field.
+      oneOf:
+        - $ref: '#/components/schemas/AiGenerateStep'
+        - $ref: '#/components/schemas/AiSummarizeStep'
+        - $ref: '#/components/schemas/DataTransformStep'
+      discriminator:
+        propertyName: type
+        mapping:
+          ai.generate: '#/components/schemas/AiGenerateStep'
+          ai.summarize: '#/components/schemas/AiSummarizeStep'
+          data.transform: '#/components/schemas/DataTransformStep'
+    WorkflowSteps:
+      type: array
+      description: Ordered steps. Between 1 and 20 steps.
+      minItems: 1
+      maxItems: 20
+      items:
+        $ref: '#/components/schemas/WorkflowStep'
+    WorkflowInputSchema:
+      type: object
+      description: >
+        JSON Schema object describing the input a run must provide. The top-level `type` must be
+        `object`. Run input is limited to 256 KB.
+      required: [type]
+      properties:
+        type:
+          type: string
+          const: object
+        properties:
+          type: object
+          additionalProperties: true
+        required:
+          type: array
+          items:
+            type: string
+      additionalProperties: true
+    WorkflowOutputs:
+      type: object
+      description: >
+        Maps output names to references. Each reference becomes a field of the run `result`.
+      minProperties: 1
+      maxProperties: 20
+      propertyNames:
+        pattern: '^[a-z][a-z0-9_]*$'
+      additionalProperties:
+        $ref: '#/components/schemas/ReferenceObject'
+
+    WorkflowSummary:
+      type: object
+      description: Workflow metadata without the step definition.
+      required: [id, name, description, type, status, version, created_at, updated_at]
+      properties:
+        id:
+          $ref: '#/components/schemas/WorkflowId'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+        type:
+          $ref: '#/components/schemas/WorkflowType'
+        status:
+          $ref: '#/components/schemas/WorkflowStatus'
+        version:
+          type: integer
+          minimum: 1
+          description: Starts at 1 and increases by one with each successful update.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Workflow:
+      description: A workflow with its full definition.
+      allOf:
+        - $ref: '#/components/schemas/WorkflowSummary'
+        - type: object
+          required: [input_schema, steps, outputs]
+          properties:
+            input_schema:
+              $ref: '#/components/schemas/WorkflowInputSchema'
+            steps:
+              $ref: '#/components/schemas/WorkflowSteps'
+            outputs:
+              $ref: '#/components/schemas/WorkflowOutputs'
+    WorkflowCreateRequest:
+      type: object
+      required: [name, steps, outputs]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+          default: ''
+        input_schema:
+          $ref: '#/components/schemas/WorkflowInputSchema'
+        steps:
+          $ref: '#/components/schemas/WorkflowSteps'
+        outputs:
+          $ref: '#/components/schemas/WorkflowOutputs'
+    WorkflowUpdateRequest:
+      type: object
+      description: Editable fields only. At least one field is required.
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+        input_schema:
+          $ref: '#/components/schemas/WorkflowInputSchema'
+        steps:
+          $ref: '#/components/schemas/WorkflowSteps'
+        outputs:
+          $ref: '#/components/schemas/WorkflowOutputs'
+
+    Pagination:
+      type: object
+      required: [limit, next_cursor, has_more]
+      properties:
+        limit:
+          type: integer
+          description: The page size used for this response.
+        next_cursor:
+          type: [string, 'null']
+          description: Pass as `cursor` to fetch the next page. `null` when `has_more` is `false`.
+        has_more:
+          type: boolean
+    WorkflowList:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    RunFailure:
+      type: object
+      description: Why a run failed. Present only when `status` is `failed`.
+      required: [code, message, step_id]
+      properties:
+        code:
+          type: string
+          enum: [STEP_FAILED, EXECUTION_TIMEOUT, INTERNAL_ERROR]
+        message:
+          type: string
+        step_id:
+          description: The step that failed, or `null` when the failure is not tied to a step.
+          oneOf:
+            - $ref: '#/components/schemas/StepId'
+            - type: 'null'
+    Run:
+      type: object
+      required:
+        - id
+        - workflow_id
+        - workflow_version
+        - status
+        - execution_mode
+        - attempt
+        - original_run_id
+        - created_at
+        - started_at
+        - completed_at
+        - cancel_requested_at
+        - failure
+      properties:
+        id:
+          $ref: '#/components/schemas/RunId'
+        workflow_id:
+          $ref: '#/components/schemas/WorkflowId'
+        workflow_version:
+          type: integer
+          minimum: 1
+          description: The workflow version this run started with. Later edits do not change it.
+        status:
+          $ref: '#/components/schemas/RunStatus'
+        execution_mode:
+          $ref: '#/components/schemas/ExecutionMode'
+        attempt:
+          type: integer
+          minimum: 1
+          description: 1 for the first run. Each manual retry adds one.
+        original_run_id:
+          description: ID of the first run in a retry chain. `null` for a run that is not a retry.
+          oneOf:
+            - $ref: '#/components/schemas/RunId'
+            - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: [string, 'null']
+          format: date-time
+        completed_at:
+          type: [string, 'null']
+          format: date-time
+          description: Set when the run reaches a terminal state.
+        cancel_requested_at:
+          type: [string, 'null']
+          format: date-time
+          description: Set when cancellation was requested. The run may still be `running`.
+        failure:
+          oneOf:
+            - $ref: '#/components/schemas/RunFailure'
+            - type: 'null'
+    RunWithResult:
+      description: >
+        A run returned by a synchronous request that finished in time. `result` is populated when
+        `status` is `succeeded` and `null` otherwise.
+      allOf:
+        - $ref: '#/components/schemas/Run'
+        - type: object
+          required: [result]
+          properties:
+            result:
+              type: [object, 'null']
+              additionalProperties: true
+    RunCreateRequest:
+      type: object
+      required: [input]
+      additionalProperties: false
+      properties:
+        execution_mode:
+          $ref: '#/components/schemas/ExecutionMode'
+          default: async
+        wait_timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 30
+          default: 30
+          description: Maximum seconds to wait for completion. Valid only when `execution_mode` is `sync`.
+        input:
+          type: object
+          description: Run input. Validated against the workflow's `input_schema`. Maximum 256 KB.
+          additionalProperties: true
+    RunResult:
+      type: object
+      required: [run_id, status, result, step_outputs, completed_at]
+      properties:
+        run_id:
+          $ref: '#/components/schemas/RunId'
+        status:
+          type: string
+          const: succeeded
+        result:
+          type: object
+          description: The workflow `outputs`, resolved. Maximum 1 MB.
+          additionalProperties: true
+        step_outputs:
+          type: object
+          description: Output of every step, keyed by step ID.
+          additionalProperties:
+            type: object
+            additionalProperties: true
+        completed_at:
+          type: string
+          format: date-time
+    RunList:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Run'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    ErrorDetail:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          description: Path to the offending field, for example `steps[1].input.value`.
+        message:
+          type: string
+    ErrorBody:
+      type: object
+      required: [code, message, request_id, details]
+      properties:
+        code:
+          type: string
+          enum:
+            - INVALID_REQUEST
+            - UNAUTHENTICATED
+            - FORBIDDEN
+            - RESOURCE_NOT_FOUND
+            - INVALID_STATE
+            - RUN_NOT_COMPLETED
+            - IDEMPOTENCY_CONFLICT
+            - VALIDATION_ERROR
+            - RATE_LIMITED
+            - INTERNAL_ERROR
+            - SERVICE_UNAVAILABLE
+        message:
+          type: string
+        request_id:
+          type: string
+          description: Include this value when asking for help with a request.
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+
+  examples:
+    WorkflowListExample:
+      summary: Predefined and custom workflows
+      value:
+        data:
+          - id: wf_summarize_text
+            name: Summarize text
+            description: Summarizes the supplied text.
+            type: predefined
+            status: active
+            version: 1
+            created_at: '2026-01-01T00:00:00Z'
+            updated_at: '2026-01-01T00:00:00Z'
+          - id: wf_customer_onboarding
+            name: Customer onboarding
+            description: Drafts a short welcome message for a new customer.
+            type: custom
+            status: active
+            version: 1
+            created_at: '2026-11-22T18:00:00Z'
+            updated_at: '2026-11-22T18:00:00Z'
+        pagination:
+          limit: 20
+          next_cursor: null
+          has_more: false
+    WorkflowCreateExample:
+      summary: Two chained steps
+      value:
+        name: Customer onboarding
+        description: Drafts a short welcome message for a new customer.
+        input_schema:
+          type: object
+          properties:
+            customer_name:
+              type: string
+          required: [customer_name]
+        steps:
+          - id: generate_welcome
+            type: ai.generate
+            input:
+              prompt:
+                ref: input.customer_name
+            config:
+              instruction: Write a two-sentence welcome message for the customer named in the prompt.
+          - id: tidy_welcome
+            type: data.transform
+            input:
+              value:
+                ref: steps.generate_welcome.output.text
+            config:
+              operation: trim
+        outputs:
+          welcome_message:
+            ref: steps.tidy_welcome.output.value
+    WorkflowExample:
+      summary: Custom workflow at version 1
+      value:
+        id: wf_customer_onboarding
+        name: Customer onboarding
+        description: Drafts a short welcome message for a new customer.
+        type: custom
+        status: active
+        version: 1
+        created_at: '2026-11-22T18:00:00Z'
+        updated_at: '2026-11-22T18:00:00Z'
+        input_schema:
+          type: object
+          properties:
+            customer_name:
+              type: string
+          required: [customer_name]
+        steps:
+          - id: generate_welcome
+            type: ai.generate
+            input:
+              prompt:
+                ref: input.customer_name
+            config:
+              instruction: Write a two-sentence welcome message for the customer named in the prompt.
+          - id: tidy_welcome
+            type: data.transform
+            input:
+              value:
+                ref: steps.generate_welcome.output.text
+            config:
+              operation: trim
+        outputs:
+          welcome_message:
+            ref: steps.tidy_welcome.output.value
+    RunQueuedExample:
+      summary: Accepted run
+      value:
+        id: run_01JXYZ123
+        workflow_id: wf_customer_onboarding
+        workflow_version: 1
+        status: queued
+        execution_mode: async
+        attempt: 1
+        original_run_id: null
+        created_at: '2026-11-22T18:15:00Z'
+        started_at: null
+        completed_at: null
+        cancel_requested_at: null
+        failure: null
+    RunSyncSucceededExample:
+      summary: Synchronous run that finished in time
+      value:
+        id: run_01JXYZ140
+        workflow_id: wf_customer_onboarding
+        workflow_version: 1
+        status: succeeded
+        execution_mode: sync
+        attempt: 1
+        original_run_id: null
+        created_at: '2026-11-22T18:20:00Z'
+        started_at: '2026-11-22T18:20:00Z'
+        completed_at: '2026-11-22T18:20:06Z'
+        cancel_requested_at: null
+        failure: null
+        result:
+          welcome_message: Welcome aboard, Alex! We are glad to have you with us.
+    RunFailedExample:
+      summary: Failed run
+      value:
+        id: run_01JXYZ150
+        workflow_id: wf_customer_onboarding
+        workflow_version: 1
+        status: failed
+        execution_mode: async
+        attempt: 1
+        original_run_id: null
+        created_at: '2026-11-22T18:30:00Z'
+        started_at: '2026-11-22T18:30:01Z'
+        completed_at: '2026-11-22T18:30:04Z'
+        cancel_requested_at: null
+        failure:
+          code: STEP_FAILED
+          message: The step could not be completed.
+          step_id: generate_welcome
+    RunRetryExample:
+      summary: Run created by a retry
+      value:
+        id: run_01JXYZ151
+        workflow_id: wf_customer_onboarding
+        workflow_version: 1
+        status: queued
+        execution_mode: async
+        attempt: 2
+        original_run_id: run_01JXYZ150
+        created_at: '2026-11-22T18:35:00Z'
+        started_at: null
+        completed_at: null
+        cancel_requested_at: null
+        failure: null
+    RunCancelRequestedExample:
+      summary: Cancellation accepted but not yet complete
+      value:
+        id: run_01JXYZ123
+        workflow_id: wf_customer_onboarding
+        workflow_version: 1
+        status: running
+        execution_mode: async
+        attempt: 1
+        original_run_id: null
+        created_at: '2026-11-22T18:15:00Z'
+        started_at: '2026-11-22T18:15:01Z'
+        completed_at: null
+        cancel_requested_at: '2026-11-22T18:15:03Z'
+        failure: null
+    RunResultExample:
+      summary: Successful run result
+      value:
+        run_id: run_01JXYZ140
+        status: succeeded
+        result:
+          welcome_message: Welcome aboard, Alex! We are glad to have you with us.
+        step_outputs:
+          generate_welcome:
+            text: ' Welcome aboard, Alex! We are glad to have you with us. '
+          tidy_welcome:
+            value: Welcome aboard, Alex! We are glad to have you with us.
+        completed_at: '2026-11-22T18:20:06Z'
+    RunListExample:
+      summary: Recent runs
+      value:
+        data:
+          - id: run_01JXYZ151
+            workflow_id: wf_customer_onboarding
+            workflow_version: 1
+            status: queued
+            execution_mode: async
+            attempt: 2
+            original_run_id: run_01JXYZ150
+            created_at: '2026-11-22T18:35:00Z'
+            started_at: null
+            completed_at: null
+            cancel_requested_at: null
+            failure: null
+          - id: run_01JXYZ150
+            workflow_id: wf_customer_onboarding
+            workflow_version: 1
+            status: failed
+            execution_mode: async
+            attempt: 1
+            original_run_id: null
+            created_at: '2026-11-22T18:30:00Z'
+            started_at: '2026-11-22T18:30:01Z'
+            completed_at: '2026-11-22T18:30:04Z'
+            cancel_requested_at: null
+            failure:
+              code: STEP_FAILED
+              message: The step could not be completed.
+              step_id: generate_welcome
+        pagination:
+          limit: 20
+          next_cursor: null
+          has_more: false

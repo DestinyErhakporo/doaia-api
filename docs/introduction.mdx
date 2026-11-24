@@ -1,0 +1,48 @@
+---
+title: "Introduction"
+description: "What DOAIA is, who it is for, and what version 1 includes."
+keywords: ["DOAIA", "workflow orchestration", "REST API", "overview"]
+---
+
+import NotLive from "/snippets/not-live.mdx";
+
+<NotLive />
+
+DOAIA is a REST API concept for defining, running and monitoring automated workflows, including AI-oriented steps. You describe a workflow once, start runs of it, and track each run from `queued` to a final state.
+
+## Who it is for
+
+- Backend developers adding workflow automation to an application.
+- AI developers designing multi-step, AI-enabled processes.
+- Full-stack developers who need a documented API contract.
+- Teams evaluating how workflow execution and observability could be exposed over REST.
+
+## What version 1 includes
+
+- Predefined (read-only) and custom workflows.
+- Three step types: `ai.generate`, `ai.summarize` and `data.transform`.
+- Synchronous and asynchronous runs, with polling for status and results.
+- Cancellation of queued or running runs, and manual retry of failed runs.
+- Account-wide and per-workflow run history.
+- Bearer API-key authentication, cursor pagination, a standard error envelope and idempotent run creation.
+
+## What version 1 does not include
+
+Visual workflow builders, scheduled runs, webhooks, automatic retries, parallel branches, loops, conditional steps, arbitrary HTTP steps, billing and team administration are out of scope.
+
+## Where to go next
+
+<Columns cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/docs/quickstart">
+    Create a workflow, start a run and read its result.
+  </Card>
+  <Card title="Authentication" icon="key" href="/docs/authentication">
+    Send your API key as a bearer token.
+  </Card>
+  <Card title="Core concepts" icon="book" href="/docs/concepts/workflows">
+    Workflows, steps, execution modes and run states.
+  </Card>
+  <Card title="API reference" icon="code" href="/docs/api-reference/overview">
+    All 12 endpoints, generated from the OpenAPI contract.
+  </Card>
+</Columns>

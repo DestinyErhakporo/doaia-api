@@ -1,0 +1,40 @@
+---
+title: "Execution modes"
+description: "Synchronous and asynchronous runs, the 200 versus 202 responses, and idempotency."
+keywords: ["sync", "async", "wait_timeout_seconds", "idempotency", "202"]
+---
+
+Both modes create the same run resource. They differ only in whether the request waits for the run to finish.
+
+## Compare the modes
+
+| Mode | What the request does | Success response |
+| --- | --- | --- |
+| `async` (default) | Returns once the run is accepted. | `202 Accepted` with the run in `queued` or `running` |
+| `sync`, finished in time | Waits up to `wait_timeout_seconds`. | `200 OK` with the run and its `result` |
+| `sync`, wait expired | Stops waiting. The run keeps executing. | `202 Accepted` with the same run ID |
+
+When a wait expires, poll the returned run ID like any asynchronous run.
+
+## The wait period
+
+`wait_timeout_seconds` is valid only when `execution_mode` is `sync`. It accepts 1 to 30 and defaults to 30. Sending it with `async`, or a value above 30, returns `400 INVALID_REQUEST`.
+
+A synchronous run that finishes in time returns `200` even if its `status` is `failed`. Check `status` and `failure`. For a run that succeeded, `result` holds the workflow outputs; otherwise it is `null`.
+
+## Idempotency
+
+Send an `Idempotency-Key` header on run creation so you can retry safely after a timeout or network error.
+
+| Scenario | Result |
+| --- | --- |
+| Same key, same request | The original response is returned, with `Idempotent-Replayed: true`. No new run is created. |
+| Same key, different request | `409 IDEMPOTENCY_CONFLICT`. |
+| Key older than 24 hours | The key has expired and is treated as new. |
+
+Use a unique value per intended run, such as a UUID.
+
+## Related
+
+- [Run a workflow](/docs/guides/run-a-workflow)
+- [Runs and states](/docs/concepts/runs-and-states)

@@ -1,0 +1,17 @@
+# Redocly CLI lint configuration for openapi/openapi.yaml
+extends:
+  - recommended
+
+rules:
+  # No license has been chosen for this project yet.
+  info-license: off
+  # The server URL is an intentional placeholder.
+  no-server-example.com: off
+  # Treat these as hard failures in CI.
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-summary: error
+  operation-4xx-response: error
+  tag-description: error
+  no-unused-components: error
+  no-invalid-media-type-examples: error

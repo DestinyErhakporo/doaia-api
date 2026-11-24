@@ -1,0 +1,51 @@
+---
+title: "Errors"
+description: "The standard error envelope and every error code."
+keywords: ["errors", "error codes", "request_id", "VALIDATION_ERROR"]
+---
+
+Every error response uses the same envelope.
+
+```json Error response
+{
+  "error": {
+    "code": "RUN_NOT_COMPLETED",
+    "message": "Results are not available yet.",
+    "request_id": "req_01JXYZ123",
+    "details": []
+  }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `code` | Stable, machine-readable code. Branch on this, not on `message`. |
+| `message` | Human-readable explanation. Wording can change. |
+| `request_id` | Include it when asking for help with a request. |
+| `details` | Array of `field` and `message` pairs. Empty when not applicable. |
+
+## Error codes
+
+| Code | Status | Meaning |
+| --- | --- | --- |
+| `INVALID_REQUEST` | `400` | Malformed request or invalid parameter. |
+| `UNAUTHENTICATED` | `401` | Missing or invalid credentials. |
+| `FORBIDDEN` | `403` | Authenticated but not permitted, for example changing a predefined workflow. |
+| `RESOURCE_NOT_FOUND` | `404` | The resource does not exist, has expired, or is not accessible. |
+| `INVALID_STATE` | `409` | The action is not valid for the current state. |
+| `RUN_NOT_COMPLETED` | `409` | Results are not available because the run is not complete. |
+| `IDEMPOTENCY_CONFLICT` | `409` | The idempotency key was already used with a different request. |
+| `VALIDATION_ERROR` | `422` | Workflow, step or input validation failed. |
+| `RATE_LIMITED` | `429` | Request limit exceeded. |
+| `INTERNAL_ERROR` | `500` | Unexpected server-side error. |
+| `SERVICE_UNAVAILABLE` | `503` | The service is temporarily unavailable. |
+
+<Note>
+  `IDEMPOTENCY_CONFLICT` is a v1 design addition so that clients can tell an idempotency conflict apart from a state conflict. Both use status `409`.
+</Note>
+
+## Handling errors
+
+- Retry `429`, `500` and `503` with backoff. For `429`, wait the number of seconds in the `Retry-After` header.
+- Do not retry `400`, `401`, `403`, `404` or `422` without changing the request.
+- For `409`, read `code`: `RUN_NOT_COMPLETED` means keep polling, `INVALID_STATE` means the resource cannot take that action, and `IDEMPOTENCY_CONFLICT` means use a new key.

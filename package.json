@@ -1,0 +1,16 @@
+{
+  "name": "doaia-api-docs",
+  "private": true,
+  "description": "Tooling for the DOAIA API docs: OpenAPI lint and Mintlify validation.",
+  "scripts": {
+    "lint:openapi": "redocly lint openapi/openapi.yaml",
+    "bundle:openapi": "redocly bundle openapi/openapi.yaml -o bundled/doaia-openapi.yaml",
+    "validate:docs": "mint validate",
+    "check:links": "mint broken-links",
+    "check": "npm run lint:openapi && npm run validate:docs && npm run check:links"
+  },
+  "devDependencies": {
+    "@redocly/cli": "2.83.0",
+    "mint": "4.3.89"
+  }
+}

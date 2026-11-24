@@ -1,0 +1,128 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "DOAIA API",
+  "description": "Developer documentation for DOAIA, a fictional AI workflow orchestration API. Conceptual portfolio project; no live service.",
+  "colors": {
+    "primary": "#0B2E6B",
+    "light": "#FFFFFF",
+    "dark": "#0B2E6B"
+  },
+  "background": {
+    "color": {
+      "light": "#FFFFFF",
+      "dark": "#07122B"
+    }
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "favicon": "/favicon.svg",
+  "appearance": {
+    "default": "system"
+  },
+  "banner": {
+    "content": "DOAIA is a fictional portfolio project. There is no live API; all hosts, keys and IDs are placeholders.",
+    "dismissible": false,
+    "type": "info",
+    "color": {
+      "light": "#0B2E6B",
+      "dark": "#143A82"
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "type": "github",
+        "href": "https://github.com/DestinyErhakporo/doaia-api"
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/DestinyErhakporo/doaia-api"
+    }
+  },
+  "api": {
+    "playground": {
+      "display": "simple"
+    },
+    "examples": {
+      "languages": ["bash", "javascript", "python"],
+      "defaults": "required"
+    }
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting started",
+        "pages": [
+          "docs/introduction",
+          "docs/quickstart",
+          "docs/authentication"
+        ]
+      },
+      {
+        "group": "Core concepts",
+        "pages": [
+          "docs/concepts/workflows",
+          "docs/concepts/workflow-steps",
+          "docs/concepts/execution-modes",
+          "docs/concepts/runs-and-states",
+          "docs/concepts/retries-and-cancellation"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "docs/guides/create-a-workflow",
+          "docs/guides/run-a-workflow",
+          "docs/guides/inspect-a-run",
+          "docs/guides/retry-and-cancel"
+        ]
+      },
+      {
+        "group": "API reference",
+        "openapi": {
+          "source": "openapi/openapi.yaml",
+          "directory": "docs/api-reference"
+        },
+        "pages": [
+          "docs/api-reference/overview",
+          {
+            "group": "Workflows",
+            "pages": [
+              "GET /v1/workflows",
+              "POST /v1/workflows",
+              "GET /v1/workflows/{workflow_id}",
+              "PATCH /v1/workflows/{workflow_id}",
+              "DELETE /v1/workflows/{workflow_id}"
+            ]
+          },
+          {
+            "group": "Runs",
+            "pages": [
+              "POST /v1/workflows/{workflow_id}/runs",
+              "GET /v1/workflows/{workflow_id}/runs",
+              "GET /v1/runs",
+              "GET /v1/runs/{run_id}",
+              "GET /v1/runs/{run_id}/results",
+              "POST /v1/runs/{run_id}/cancel",
+              "POST /v1/runs/{run_id}/retry"
+            ]
+          }
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "docs/reference/errors",
+          "docs/reference/pagination",
+          "docs/reference/limits-and-retention",
+          "docs/reference/versioning"
+        ]
+      }
+    ]
+  }
+}

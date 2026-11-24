@@ -1,0 +1,51 @@
+---
+title: "Workflows"
+description: "Predefined and custom workflows, their structure, versioning and archiving."
+keywords: ["workflow", "predefined", "custom", "version", "archive"]
+---
+
+A workflow is a named, versioned definition of what to run: the input it accepts, an ordered list of steps, and the outputs it returns.
+
+## Types
+
+| Type | Who manages it | Can you change it? |
+| --- | --- | --- |
+| `predefined` | DOAIA | No. Read-only. Changes return `403 FORBIDDEN`. |
+| `custom` | You | Yes: create, update and archive. |
+
+The predefined workflows in this documentation are illustrative.
+
+| ID | Purpose |
+| --- | --- |
+| `wf_summarize_text` | Summarizes supplied text. |
+| `wf_generate_text` | Generates text from a prompt. |
+| `wf_trim_text` | Trims whitespace from a value. |
+
+## Structure
+
+A custom workflow has three parts:
+
+- `input_schema`: a JSON Schema object that describes the input a run must provide.
+- `steps`: between 1 and 20 steps that execute in the order declared. See [Workflow steps](/docs/concepts/workflow-steps).
+- `outputs`: a map from output names to reference objects. Each becomes a field of the run `result`.
+
+A reference object looks like `{ "ref": "steps.generate_welcome.output.text" }`. Plain strings are never treated as references.
+
+## Versioning
+
+New workflows start at `version` 1. Each successful update adds one. A run records the version it started with, so later edits never change a run in progress or in history. See [Versioning](/docs/reference/versioning).
+
+## Archiving
+
+Deleting a custom workflow archives it. An archived workflow:
+
+- cannot start new runs (`409 INVALID_STATE`) or be updated,
+- can still be retrieved, and its run history remains available,
+- is hidden from `GET /v1/workflows` unless you pass `status=archived` or `status=all`.
+
+Archiving an already archived workflow also returns `204`.
+
+## Related
+
+- [Create a workflow](/docs/guides/create-a-workflow)
+- [Runs and states](/docs/concepts/runs-and-states)

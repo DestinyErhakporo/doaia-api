@@ -1,0 +1,45 @@
+---
+title: "Limits and retention"
+description: "Illustrative v1 limits, retention periods and rate-limit headers."
+keywords: ["limits", "retention", "rate limit", "429", "Retry-After"]
+---
+
+<Note>
+  These values are design assumptions for a fictional API. They are not benchmarked performance claims.
+</Note>
+
+## Limits
+
+| Constraint | Value |
+| --- | --- |
+| Steps per workflow | 20 |
+| Workflow input | 256 KB |
+| Final result | 1 MB |
+| Execution duration | 10 minutes |
+| Synchronous wait | 30 seconds |
+| `limit` page size | Default 20, maximum 100 |
+
+A run that exceeds the execution duration ends as `failed` with failure code `EXECUTION_TIMEOUT`.
+
+## Retention
+
+| Data | Retained for |
+| --- | --- |
+| Idempotency keys | 24 hours |
+| Run history | 30 days |
+| Run results | 30 days |
+
+After the retention period, requests for the data return `404 RESOURCE_NOT_FOUND`.
+
+## Rate limiting
+
+When you exceed the request limit, the API returns `429 RATE_LIMITED` with these headers:
+
+| Header | Meaning |
+| --- | --- |
+| `Retry-After` | Seconds to wait before retrying. |
+| `X-RateLimit-Limit` | Requests allowed in the current window. |
+| `X-RateLimit-Remaining` | Requests left in the current window. |
+| `X-RateLimit-Reset` | Unix time in seconds, UTC, when the window resets. |
+
+The v1 contract does not specify numeric rate limits.

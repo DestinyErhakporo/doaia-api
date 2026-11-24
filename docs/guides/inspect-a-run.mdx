@@ -1,0 +1,89 @@
+---
+title: "Inspect a run"
+description: "Retrieve a run's state, read its results and browse run history."
+keywords: ["get run", "results", "polling", "history", "status"]
+---
+
+import NotLive from "/snippets/not-live.mdx";
+
+<NotLive />
+
+## Check status
+
+`GET /v1/runs/{run_id}` returns the run's `status`, timestamps, workflow version and attempt number.
+
+<CodeGroup>
+
+```bash cURL
+curl 'https://api.example.com/v1/runs/run_01JXYZ123' \
+  -H 'Authorization: Bearer YOUR_DOAIA_API_KEY'
+```
+
+```javascript JavaScript
+const response = await fetch("https://api.example.com/v1/runs/run_01JXYZ123", {
+  headers: { Authorization: "Bearer YOUR_DOAIA_API_KEY" },
+});
+const run = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    "https://api.example.com/v1/runs/run_01JXYZ123",
+    headers={"Authorization": "Bearer YOUR_DOAIA_API_KEY"},
+    timeout=30,
+)
+run = response.json()
+```
+
+</CodeGroup>
+
+Poll until `status` is `succeeded`, `failed` or `cancelled`. A failed run includes a `failure` object:
+
+```json Failure details
+{
+  "code": "STEP_FAILED",
+  "message": "The step could not be completed.",
+  "step_id": "generate_welcome"
+}
+```
+
+## Read results
+
+`GET /v1/runs/{run_id}/results` returns the final result of a `succeeded` run.
+
+```bash Retrieve results
+curl 'https://api.example.com/v1/runs/run_01JXYZ140/results' \
+  -H 'Authorization: Bearer YOUR_DOAIA_API_KEY'
+```
+
+```json Successful result
+{
+  "run_id": "run_01JXYZ140",
+  "status": "succeeded",
+  "result": {
+    "welcome_message": "Welcome aboard, Alex! We are glad to have you with us."
+  },
+  "step_outputs": {
+    "generate_welcome": { "text": " Welcome aboard, Alex! We are glad to have you with us. " },
+    "tidy_welcome": { "value": "Welcome aboard, Alex! We are glad to have you with us." }
+  },
+  "completed_at": "2026-11-22T18:20:06Z"
+}
+```
+
+| Run status | Response | What to do next |
+| --- | --- | --- |
+| `succeeded` | `200` | Use `result`. |
+| `queued` or `running` | `409 RUN_NOT_COMPLETED` | Keep polling the run. |
+| `failed` or `cancelled` | `409 INVALID_STATE` | Retrieve the run for failure details, or [retry](/docs/guides/retry-and-cancel). |
+
+Results are retained for 30 days.
+
+## Browse history
+
+- `GET /v1/runs` lists runs across your account, newest first.
+- `GET /v1/workflows/{workflow_id}/runs` lists runs of one workflow.
+
+Both accept `status`, `created_after`, `created_before`, `limit` and `cursor`. See [Pagination](/docs/reference/pagination).
