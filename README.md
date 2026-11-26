@@ -4,7 +4,8 @@ Conceptual AI workflow orchestration API contract and developer documentation.
 
 > **DOAIA is a fictional portfolio project.** There is no live API, no execution backend and no AI provider integration. The server URL (`https://api.example.com`), API keys and IDs are placeholders. Limits and retention periods are illustrative design assumptions.
 
-Published docs: _add the Mintlify URL here after deployment._
+Published docs: 
+https://d-tech.mintlify.app
 
 ## What it demonstrates
 
